@@ -2,12 +2,15 @@
   <div class="page">
     <van-nav-bar title="我的订单" />
 
-    <van-tabs v-model:active="roleIndex" @change="reload">
-      <van-tab title="我买到的" />
-      <van-tab title="我卖出的" />
+    <van-tabs v-model:active="role">
+      <van-tab title="我买到的" name="buyer" />
+      <van-tab title="我卖出的" name="seller" />
     </van-tabs>
 
-    <van-empty v-if="!loading && list.length === 0" :description="roleIndex === 0 ? '还没有买过东西' : '还没有卖出过东西'" />
+    <van-empty
+      v-if="!loading && list.length === 0"
+      :description="role === 'buyer' ? '还没有买过东西' : '还没有卖出过东西'"
+    />
 
     <div v-for="o in list" :key="o.orderNo" class="order" @click="open(o.orderNo)">
       <div class="head">
@@ -18,18 +21,20 @@
         <img :src="o.itemCover || ''" class="cover" alt="" />
         <div class="info">
           <div class="title">{{ o.itemTitle }}</div>
-          <div class="meta">{{ o.deliveryType === 2 ? '平台配送' : '同城自提' }} · {{ format(o.createdAt) }}</div>
+          <div class="meta">
+            {{ o.deliveryType === 2 ? '平台配送' : '同城自提' }} · {{ format(o.createdAt) }}
+          </div>
         </div>
         <div class="price">{{ o.totalAmount }}</div>
       </div>
     </div>
 
-    <van-button v-if="hasMore" block plain class="more" @click="load">加载更多</van-button>
+    <van-button v-if="hasMore" block plain class="more" @click="load()">加载更多</van-button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { pageOrders } from '@/api/order'
 import type { OrderVO } from '@/api/types'
@@ -37,42 +42,58 @@ import type { OrderVO } from '@/api/types'
 const router = useRouter()
 const route = useRoute()
 
-const roleIndex = ref(route.query.role === 'seller' ? 1 : 0)
+type Role = 'buyer' | 'seller'
+
+/** 直接用语义化的 name，不再用下标推算角色——下标和角色一旦错位就会串数据 */
+const role = ref<Role>(route.query.role === 'seller' ? 'seller' : 'buyer')
 const list = ref<OrderVO[]>([])
 const page = ref(1)
 const hasMore = ref(false)
 const loading = ref(false)
+
+/** 请求序号：切 Tab 时丢弃旧请求的响应，避免慢请求覆盖新列表 */
+let seq = 0
 
 function format(v: string) {
   return v ? v.replace('T', ' ').slice(0, 16) : ''
 }
 
 async function load(reset = false) {
-  if (loading.value) return
-  loading.value = true
+  const mySeq = ++seq
   if (reset) {
     page.value = 1
-    list.value = []
-  }
-  try {
-    const res = await pageOrders({
-      role: roleIndex.value === 0 ? 'buyer' : 'seller',
-      page: page.value,
-      size: 10
-    })
-    list.value.push(...res.list)
-    hasMore.value = list.value.length < res.total
-    page.value += 1
-  } catch {
     hasMore.value = false
+  }
+  loading.value = true
+  try {
+    const res = await pageOrders({ role: role.value, page: page.value, size: 10 })
+    if (mySeq !== seq) return
+    list.value = reset ? res.list : [...list.value, ...res.list]
+    page.value += 1
+    hasMore.value = list.value.length < res.total
+  } catch {
+    if (mySeq === seq) hasMore.value = false
   } finally {
-    loading.value = false
+    if (mySeq === seq) loading.value = false
   }
 }
 
-function reload() {
+// 用 watch 而不是 tabs 的 change 事件：保证「角色已确定」之后再发请求
+watch(role, (value) => {
   load(true)
-}
+  const query = value === 'seller' ? { role: 'seller' } : {}
+  if (route.query.role !== query.role) {
+    router.replace({ path: '/orders', query })
+  }
+})
+
+// 从「我的」页带 ?role=seller 进来、或组件被复用时同步角色
+watch(
+  () => route.query.role,
+  (value) => {
+    role.value = value === 'seller' ? 'seller' : 'buyer'
+  }
+)
 
 function open(orderNo: string) {
   router.push(`/order/${orderNo}`)
