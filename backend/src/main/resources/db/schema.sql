@@ -16,14 +16,16 @@ DROP TABLE IF EXISTS payments;
 -- ------------------------------------------------------------
 CREATE TABLE app_user (
     id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-    phone       VARCHAR(64)  NOT NULL,
+    phone       VARCHAR(20)  NOT NULL,
     nickname    VARCHAR(30)  NOT NULL,
     avatar      VARCHAR(255),
+    password    VARCHAR(100) NOT NULL DEFAULT '',
     role        VARCHAR(20)  NOT NULL DEFAULT 'both',
     credit_score INT         NOT NULL DEFAULT 100,
     status      TINYINT      NOT NULL DEFAULT 1,
     created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX uk_user_phone ON app_user (phone);
 
 -- ------------------------------------------------------------
 -- 商品

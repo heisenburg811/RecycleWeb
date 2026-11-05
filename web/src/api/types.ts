@@ -70,3 +70,17 @@ export interface PageQuery {
   page?: number
   size?: number
 }
+
+export interface UserVO {
+  id: number
+  phone: string
+  nickname: string
+  avatar: string | null
+  role: string
+}
+
+export interface LoginVO {
+  token: string
+  expiresIn: number
+  user: UserVO
+}

@@ -7,16 +7,41 @@ interface ApiResponse<T> {
   data: T
 }
 
+export const TOKEN_KEY = 'recycle_token'
+
 const http = axios.create({
   baseURL: '/api/v1',
   timeout: 15000
 })
 
 http.interceptors.request.use((config) => {
-  // TODO 接入登录后从 store 取 token
-  config.headers['X-User-Id'] = '1'
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
+
+http.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error.response?.status
+    const message = error.response?.data?.message
+
+    if (status === 401) {
+      // token 过期或未登录：清掉本地凭证，带 redirect 回登录页
+      localStorage.removeItem(TOKEN_KEY)
+      if (location.pathname !== '/login') {
+        const redirect = encodeURIComponent(location.pathname + location.search)
+        location.href = `/login?redirect=${redirect}`
+      }
+      return Promise.reject(new Error('未登录'))
+    }
+
+    showToast(message || '网络异常，请稍后再试')
+    return Promise.reject(error)
+  }
+)
 
 function unwrap<T>(res: ApiResponse<T>): T {
   if (res.code !== 0) {

@@ -6,7 +6,7 @@
 
 | 端 | 技术 |
 | --- | --- |
-| 后端 | Java 21 · Spring Boot 3.5 · MyBatis-Plus 3.5 · H2（开发）/ MySQL 8（生产） |
+| 后端 | Java 21 · Spring Boot 3.5 · Spring Security 6 + JWT · MyBatis-Plus 3.5 · H2（开发）/ MySQL 8（生产） |
 | 前端 | Vite 6 · Vue 3.5 · TypeScript · Vant 4 · Pinia · Vue Router |
 | 文档 | springdoc-openapi（Swagger UI） |
 
@@ -24,7 +24,8 @@ Recycle/
 │   └── src/main/
 │       ├── java/com/recycle/
 │       │   ├── common/           # 统一返回 R、分页、异常处理
-│       │   ├── config/           # CORS、MyBatis-Plus、OpenAPI
+│       │   ├── config/           # Security、CORS、MyBatis-Plus、OpenAPI
+│       │   ├── user/             # 注册登录、JWT 签发与校验
 │       │   ├── item/             # 商品发布 / 状态机 / 图片
 │       │   ├── search/           # 类目树 / 搜索
 │       │   ├── order/            # 订单（当前：费用试算）
@@ -55,6 +56,13 @@ cd backend
 - H2 控制台：http://localhost:8080/h2-console
   - JDBC URL：`jdbc:h2:mem:recycle`，用户名 `sa`，密码留空
 
+**演示账号**（dev profile 自动创建，密码统一 `123456`）：
+
+| 手机号 | 昵称 |
+| --- | --- |
+| 13800000001 | 旧物新生 |
+| 13800000002 | 搬家急出 |
+
 默认 `dev` profile 使用 **H2 内存库**，启动时自动执行 `db/schema.sql` + `db/data.sql`，自带 8 件演示商品，改代码重启即重建，不依赖本地装 MySQL/Redis。
 
 ### 2. 前端
@@ -79,6 +87,7 @@ cd backend
 ## 已实现（本次脚手架）
 
 - [x] 统一响应体 `R<T>`、全局异常处理、参数校验
+- [x] 登录鉴权：注册 / 登录 / 当前用户，Spring Security 6 + JWT（HS256，7 天），无状态
 - [x] 商品发布（字段校验、联系方式拦截、图片落库、自动上架）
 - [x] 商品列表 / 关键词搜索 / 多维筛选 / 排序 / 详情（浏览计数）
 - [x] 类目树（静态配置）
@@ -89,13 +98,20 @@ cd backend
 
 | 优先级 | 事项 | 位置 |
 | --- | --- | --- |
-| P0 | 登录鉴权（目前用 `X-User-Id` 头模拟，固定为 1） | `common` + 新增 `user` 模块 |
 | P0 | 完整下单：锁库存 → 建单 → 状态机 | `order`（`ItemService.reserve()` 已就绪） |
 | P0 | 支付对接（微信 / 支付宝）+ 回调 + 担保交易 | `payment` |
 | P0 | 物流预约：时段容量、运力派单、改约 | `logistics` |
 | P1 | 商品审核后台（目前发布即上架） | `item` + 管理端 |
 | P1 | 图片上传（目前前端填 URL） | 接入 OSS |
 | P2 | 类目落表、碳减排字段计算、回收表单 | `search` / `item` |
+
+## 鉴权约定
+
+- 接口分两类：**浏览开放**（GET 商品/类目/搜索，匿名可看）、**写入需登录**（POST/PUT/DELETE、`/orders/**`）。
+- 新增接口若未显式加放行规则，默认**需要登录**（fail-safe，不会误开放）。
+- 请求头：`Authorization: Bearer <token>`；token 由 `/api/v1/auth/login` 返回。
+- 未登录 / token 失效 → HTTP 401 + `{"code":40100,"message":"请先登录"}`，前端拦截器自动跳登录页并带回跳地址。
+- 密钥通过 `JWT_SECRET` 环境变量注入，默认值仅供本地开发，**上线必须替换**。
 
 ## 约定
 

@@ -1,8 +1,5 @@
 -- 开发环境演示数据（H2 内存库，每次启动重建）
-
-INSERT INTO app_user (id, phone, nickname, avatar, role) VALUES
- (1, '13800000001', '旧物新生', NULL, 'both'),
- (2, '13800000002', '搬家急出', NULL, 'seller');
+-- 注意：演示用户不在 SQL 里建，由 DevUserInitializer 用 BCrypt 加密后写入。
 
 INSERT INTO item (id, seller_id, category_id, title, description, item_condition, price,
                   length_cm, width_cm, height_cm, material, style, brand,
@@ -45,5 +42,4 @@ INSERT INTO item_image (item_id, url, sort) VALUES
 -- 这里手动把序列推到 100，否则新发布的数据会撞主键。
 ALTER TABLE item ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE item_image ALTER COLUMN id RESTART WITH 100;
-ALTER TABLE app_user ALTER COLUMN id RESTART WITH 100;
 
