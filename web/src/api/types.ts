@@ -56,6 +56,7 @@ export interface FeeDetail {
   assemblyFee: number
   serviceFee: number
   totalAmount: number
+  sellerIncome: number
   note: string
 }
 
@@ -73,6 +74,7 @@ export interface OrderVO {
   assemblyFee: number
   serviceFee: number
   totalAmount: number
+  sellerIncome: number
   deliveryType: number
   addressSnapshot: string | null
   status: string

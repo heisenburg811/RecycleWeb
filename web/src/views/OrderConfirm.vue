@@ -38,12 +38,13 @@
 
     <van-cell-group inset title="费用明细">
       <van-cell title="商品价" :value="`¥${fee?.itemPrice ?? '-'}`" />
-      <van-cell title="运费" :value="`¥${fee?.deliveryFee ?? '-'}`" />
-      <van-cell title="楼层搬运费" :value="`¥${fee?.floorFee ?? '-'}`" />
-      <van-cell title="拆装费" :value="`¥${fee?.assemblyFee ?? '-'}`" />
-      <van-cell title="平台服务费" :value="`¥${fee?.serviceFee ?? '-'}`" />
+      <van-cell v-if="form.deliveryType === 2" title="运费" :value="`¥${fee?.deliveryFee ?? '-'}`" />
+      <van-cell v-if="Number(fee?.floorFee) > 0" title="楼层搬运费" :value="`¥${fee?.floorFee ?? '-'}`" />
+      <van-cell v-if="Number(fee?.assemblyFee) > 0" title="拆装费" :value="`¥${fee?.assemblyFee ?? '-'}`" />
       <van-cell title="应付总额" :value="`¥${fee?.totalAmount ?? '-'}`" class="total" />
-      <div class="note">{{ fee?.note }}</div>
+      <div class="note">
+        {{ fee?.note }}。平台服务费 ¥{{ fee?.serviceFee ?? 0 }} 由卖家承担，不额外向你收取。
+      </div>
     </van-cell-group>
 
     <div class="bar">

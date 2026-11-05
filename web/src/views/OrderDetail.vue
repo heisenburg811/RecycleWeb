@@ -18,13 +18,20 @@
         <van-cell :title="order.itemTitle" :label="`订单号 ${order.orderNo}`" :icon="order.itemCover || undefined" is-link :to="`/item/${order.itemId}`" />
       </van-cell-group>
 
-      <van-cell-group inset title="费用">
-        <van-cell title="商品价" :value="`¥${order.itemPrice}`" />
-        <van-cell v-if="order.deliveryType === 2" title="运费" :value="`¥${order.deliveryFee}`" />
-        <van-cell v-if="Number(order.floorFee) > 0" title="楼层搬运费" :value="`¥${order.floorFee}`" />
-        <van-cell v-if="Number(order.assemblyFee) > 0" title="拆装费" :value="`¥${order.assemblyFee}`" />
-        <van-cell title="平台服务费" :value="`¥${order.serviceFee}`" />
-        <van-cell title="实付" :value="`¥${order.totalAmount}`" class="total" />
+      <van-cell-group inset :title="isSeller ? '货款结算' : '费用'">
+        <template v-if="isSeller">
+          <van-cell title="商品成交价" :value="`¥${order.itemPrice}`" />
+          <van-cell title="平台服务费" :value="`-¥${order.serviceFee}`" value-class="minus" />
+          <van-cell title="你实收" :value="`¥${order.sellerIncome}`" class="total" />
+          <div class="note">运费与搬运费由买家支付给运力方，不经过你</div>
+        </template>
+        <template v-else>
+          <van-cell title="商品价" :value="`¥${order.itemPrice}`" />
+          <van-cell v-if="order.deliveryType === 2" title="运费" :value="`¥${order.deliveryFee}`" />
+          <van-cell v-if="Number(order.floorFee) > 0" title="楼层搬运费" :value="`¥${order.floorFee}`" />
+          <van-cell v-if="Number(order.assemblyFee) > 0" title="拆装费" :value="`¥${order.assemblyFee}`" />
+          <van-cell title="实付" :value="`¥${order.totalAmount}`" class="total" />
+        </template>
       </van-cell-group>
 
       <van-cell-group inset title="信息">
@@ -150,6 +157,16 @@ onUnmounted(() => {
 
 .total {
   font-weight: 600;
+}
+
+.note {
+  font-size: 12px;
+  color: #969799;
+  padding: 8px 16px;
+}
+
+:deep(.minus) {
+  color: #ee0a24;
 }
 
 .actions {

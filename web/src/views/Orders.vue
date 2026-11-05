@@ -25,7 +25,10 @@
             {{ o.deliveryType === 2 ? '平台配送' : '同城自提' }} · {{ format(o.createdAt) }}
           </div>
         </div>
-        <div class="price">{{ o.totalAmount }}</div>
+        <div class="price">
+          <span class="price-tag">{{ role === 'seller' ? '实收' : '实付' }}</span>
+          <span class="price-num">¥{{ role === 'seller' ? o.sellerIncome : o.totalAmount }}</span>
+        </div>
       </div>
     </div>
 
@@ -172,14 +175,19 @@ onMounted(() => load(true))
 }
 
 .price {
-  color: #ee0a24;
-  font-weight: 600;
   flex-shrink: 0;
+  text-align: right;
 }
 
-.price::before {
-  content: '¥';
-  font-size: 12px;
+.price-tag {
+  display: block;
+  font-size: 11px;
+  color: #969799;
+}
+
+.price-num {
+  color: #ee0a24;
+  font-weight: 600;
 }
 
 .more {

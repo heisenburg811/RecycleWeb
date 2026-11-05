@@ -327,10 +327,14 @@ public class OrderService {
     }
 
     private OrderVO toVO(Order o) {
+        // 卖家实收 = 商品价 − 平台服务费；老数据 serviceFee 为空时按 0 处理
+        BigDecimal serviceFee = o.getServiceFee() == null ? BigDecimal.ZERO : o.getServiceFee();
+        BigDecimal sellerIncome = o.getItemPrice().subtract(serviceFee);
+
         return new OrderVO(o.getId(), o.getOrderNo(), o.getItemId(), o.getItemTitle(), o.getItemCover(),
                 o.getBuyerId(), o.getSellerId(),
                 o.getItemPrice(), o.getDeliveryFee(), o.getFloorFee(), o.getAssemblyFee(), o.getServiceFee(),
-                o.getTotalAmount(), o.getDeliveryType(), o.getAddressSnapshot(),
+                o.getTotalAmount(), sellerIncome, o.getDeliveryType(), o.getAddressSnapshot(),
                 o.getStatus(), OrderStatus.labelOf(o.getStatus()),
                 o.getPayExpireAt(), o.getPaidAt(), o.getShippedAt(), o.getCompletedAt(),
                 o.getRemark(), o.getCreatedAt());

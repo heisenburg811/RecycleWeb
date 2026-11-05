@@ -20,6 +20,8 @@ public record OrderVO(
         BigDecimal assemblyFee,
         BigDecimal serviceFee,
         BigDecimal totalAmount,
+        /** 卖家实收 = 商品价 − 平台服务费（运费等归运力方，不经过卖家） */
+        BigDecimal sellerIncome,
         Integer deliveryType,
         String addressSnapshot,
         String status,

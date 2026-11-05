@@ -56,11 +56,17 @@ public class FeeCalculator {
             note = "平台配送，含运费与搬运服务";
         }
 
+        // 平台服务费由卖家承担，从卖家所得中扣除；买家实付不含此项
         BigDecimal serviceFee = itemPrice.multiply(SERVICE_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal total = itemPrice.add(deliveryFee).add(floorFee).add(assemblyFee).add(serviceFee);
+
+        BigDecimal total = itemPrice.add(deliveryFee).add(floorFee).add(assemblyFee);
+        BigDecimal sellerIncome = itemPrice.subtract(serviceFee);
 
         return new FeeDetailVO(req.getItemId(), itemPrice, deliveryFee, floorFee,
-                assemblyFee, serviceFee, total.setScale(2, RoundingMode.HALF_UP), note);
+                assemblyFee, serviceFee,
+                total.setScale(2, RoundingMode.HALF_UP),
+                sellerIncome.setScale(2, RoundingMode.HALF_UP),
+                note);
     }
 
     /**
