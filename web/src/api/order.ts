@@ -13,10 +13,6 @@ export function payOrder(orderNo: string, channel = 'mock'): Promise<OrderVO> {
   return post<OrderVO>(`/orders/${orderNo}/pay`, { channel })
 }
 
-export function shipOrder(orderNo: string): Promise<OrderVO> {
-  return post<OrderVO>(`/orders/${orderNo}/ship`)
-}
-
 export function confirmOrder(orderNo: string): Promise<OrderVO> {
   return post<OrderVO>(`/orders/${orderNo}/confirm`)
 }

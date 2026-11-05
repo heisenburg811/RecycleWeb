@@ -150,46 +150,66 @@ public class OrderService {
 
     // ------------------------------------------------------------------ 履约
 
-    /** 卖家发货。接入物流后改由运力接单回调驱动。 */
-    public OrderVO ship(String orderNo, Long sellerId) {
-        Order order = requireOrder(orderNo);
-        if (!order.getSellerId().equals(sellerId)) {
-            throw new BizException("无权操作该订单");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
-                .eq(Order::getId, order.getId())
-                .eq(Order::getStatus, OrderStatus.PAID.name())
-                .set(Order::getStatus, OrderStatus.SHIPPED.name())
-                .set(Order::getShippedAt, now));
-        if (rows == 0) {
-            throw new BizException("订单当前状态不可发货");
-        }
-        order.setStatus(OrderStatus.SHIPPED.name());
-        order.setShippedAt(now);
-        return toVO(order);
-    }
-
-    /** 买家确认收货 → 订单完成、商品标记已售出。 */
+    /**
+     * 买家确认收货 → 订单完成、商品标记已售出。
+     *
+     * <p>配送单需要先到「配送中」（由物流预约 + 到点自动推进）；
+     * 自提单没有配送环节，付款后即可确认。
+     */
     @Transactional(rollbackFor = Exception.class)
     public OrderVO confirm(String orderNo, Long buyerId) {
         Order order = requireOrder(orderNo);
         if (!order.getBuyerId().equals(buyerId)) {
             throw new BizException("无权操作该订单");
         }
+
+        boolean selfPickup = Integer.valueOf(1).equals(order.getDeliveryType());
+        String requiredStatus = selfPickup
+                ? OrderStatus.PAID.name()
+                : OrderStatus.DELIVERING.name();
+
         LocalDateTime now = LocalDateTime.now();
         int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
                 .eq(Order::getId, order.getId())
-                .eq(Order::getStatus, OrderStatus.SHIPPED.name())
+                .eq(Order::getStatus, requiredStatus)
                 .set(Order::getStatus, OrderStatus.COMPLETED.name())
                 .set(Order::getCompletedAt, now));
         if (rows == 0) {
-            throw new BizException("订单当前状态不可确认收货");
+            throw new BizException(selfPickup ? "订单当前状态不可确认收货" : "配送尚未完成，暂不能确认收货");
         }
         itemService.markSold(order.getItemId());
         order.setStatus(OrderStatus.COMPLETED.name());
         order.setCompletedAt(now);
         return toVO(order);
+    }
+
+    // ------------------------------------------------------- 供 logistics 模块调用
+
+    /**
+     * 取出订单并校验买家身份（物流模块预约时用）。
+     */
+    public Order requireBuyerOrder(String orderNo, Long buyerId) {
+        Order order = requireOrder(orderNo);
+        if (!order.getBuyerId().equals(buyerId)) {
+            throw new BizException("无权操作该订单");
+        }
+        return order;
+    }
+
+    /** PAID → SCHEDULED，返回是否推进成功 */
+    public boolean markScheduled(String orderNo) {
+        return orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderNo, orderNo)
+                .eq(Order::getStatus, OrderStatus.PAID.name())
+                .set(Order::getStatus, OrderStatus.SCHEDULED.name())) > 0;
+    }
+
+    /** SCHEDULED → DELIVERING，返回是否推进成功 */
+    public boolean markDelivering(String orderNo) {
+        return orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderNo, orderNo)
+                .eq(Order::getStatus, OrderStatus.SCHEDULED.name())
+                .set(Order::getStatus, OrderStatus.DELIVERING.name())) > 0;
     }
 
     /** 买家取消未支付订单，释放商品。 */

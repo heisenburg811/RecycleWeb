@@ -124,6 +124,19 @@ CREATE TABLE order_logistics (
 CREATE UNIQUE INDEX uk_logistics_order ON order_logistics (order_no);
 
 -- ------------------------------------------------------------
+-- 配送时段容量（按日期 + 时段计数，下单用条件更新防超卖）
+-- ------------------------------------------------------------
+CREATE TABLE logistics_slot (
+    id         BIGINT PRIMARY KEY AUTO_INCREMENT,
+    slot_date  DATE        NOT NULL,
+    slot_code  VARCHAR(10) NOT NULL,
+    start_hour INT         NOT NULL,
+    capacity   INT         NOT NULL DEFAULT 5,
+    booked     INT         NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX uk_slot_date_code ON logistics_slot (slot_date, slot_code);
+
+-- ------------------------------------------------------------
 -- 支付流水
 -- ------------------------------------------------------------
 CREATE TABLE payments (

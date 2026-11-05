@@ -8,20 +8,36 @@
         <div v-if="order.status === 'PENDING_PAYMENT'" class="hero-sub">
           请在 {{ countdown }} 内完成支付
         </div>
-        <div v-else-if="order.status === 'PAID'" class="hero-sub">等待卖家发货</div>
-        <div v-else-if="order.status === 'SHIPPED'" class="hero-sub">确认无误后请点确认收货</div>
+        <div v-else-if="order.status === 'PAID' && order.deliveryType === 2" class="hero-sub">
+          请预约一个配送时段
+        </div>
+        <div v-else-if="order.status === 'PAID'" class="hero-sub">与卖家约定时间自提，取货后确认</div>
+        <div v-else-if="order.status === 'SCHEDULED'" class="hero-sub">
+          已预约 {{ scheduleText }}，到点自动出发
+        </div>
+        <div v-else-if="order.status === 'DELIVERING'" class="hero-sub">配送中，收到货后请确认</div>
         <div v-else-if="order.status === 'COMPLETED'" class="hero-sub">交易完成，感谢让旧物新生</div>
         <div v-else class="hero-sub">交易已结束</div>
       </div>
 
       <van-cell-group inset title="商品">
-        <van-cell :title="order.itemTitle" :label="`订单号 ${order.orderNo}`" :icon="order.itemCover || undefined" is-link :to="`/item/${order.itemId}`" />
+        <van-cell :title="order.itemTitle" :label="`订单号 ${order.orderNo}`" is-link :to="`/item/${order.itemId}`">
+          <template #icon>
+            <img :src="order.itemCover || ''" class="thumb" alt="" />
+          </template>
+        </van-cell>
+      </van-cell-group>
+
+      <van-cell-group v-if="logistics" inset title="配送信息">
+        <van-cell title="预约时段" :value="scheduleText" />
+        <van-cell title="司机" :value="`${logistics.driverName} ${logistics.driverPhone}`" />
+        <van-cell title="运力方" :value="logistics.provider === 'mock' ? '平台派单（模拟）' : logistics.provider" />
       </van-cell-group>
 
       <van-cell-group inset :title="isSeller ? '货款结算' : '费用'">
         <template v-if="isSeller">
           <van-cell title="商品成交价" :value="`¥${order.itemPrice}`" />
-          <van-cell title="平台服务费" :value="`-¥${order.serviceFee}`" value-class="minus" />
+          <van-cell title="平台服务费" :value="`-¥${order.serviceFee}`" class="minus" />
           <van-cell title="你实收" :value="`¥${order.sellerIncome}`" class="total" />
           <div class="note">运费与搬运费由买家支付给运力方，不经过你</div>
         </template>
@@ -47,12 +63,32 @@
           <van-button block round plain @click="onCancel">取消订单</van-button>
           <van-button block round type="danger" class="mt" :loading="busy" @click="onPay">立即支付</van-button>
         </template>
-        <van-button v-if="isSeller && order.status === 'PAID'" block round type="primary" :loading="busy" @click="onShip">
-          发货
-        </van-button>
-        <van-button v-if="isBuyer && order.status === 'SHIPPED'" block round type="danger" :loading="busy" @click="onConfirm">
-          确认收货
-        </van-button>
+
+        <van-button
+          v-if="isBuyer && order.status === 'PAID' && order.deliveryType === 2"
+          block
+          round
+          type="primary"
+          @click="goLogistics(false)"
+        >预约配送</van-button>
+
+        <van-button
+          v-if="isBuyer && order.status === 'SCHEDULED' && logistics?.canReschedule"
+          block
+          round
+          plain
+          class="mt"
+          @click="goLogistics(true)"
+        >改约配送</van-button>
+
+        <van-button
+          v-if="isBuyer && ((order.status === 'DELIVERING') || (order.status === 'PAID' && order.deliveryType === 1))"
+          block
+          round
+          type="danger"
+          :loading="busy"
+          @click="onConfirm"
+        >确认收货</van-button>
       </div>
     </template>
   </div>
@@ -62,20 +98,29 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { cancelOrder, confirmOrder, getOrder, payOrder, shipOrder } from '@/api/order'
+import { cancelOrder, confirmOrder, getOrder, payOrder } from '@/api/order'
+import { getLogistics } from '@/api/logistics'
+import type { LogisticsVO } from '@/api/logistics-types'
 import type { OrderVO } from '@/api/types'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
+
 const order = ref<OrderVO | null>(null)
+const logistics = ref<LogisticsVO | null>(null)
 const busy = ref(false)
 const now = ref(Date.now())
 let timer: number | undefined
 
 const isBuyer = computed(() => store.user?.id === order.value?.buyerId)
 const isSeller = computed(() => store.user?.id === order.value?.sellerId)
+
+const scheduleText = computed(() => {
+  const l = logistics.value
+  return l ? `${l.scheduleDate} ${l.scheduleSlot}` : '-'
+})
 
 const countdown = computed(() => {
   if (!order.value?.payExpireAt) return '-'
@@ -92,6 +137,7 @@ function format(v: string | null) {
 
 async function load() {
   order.value = await getOrder(String(route.params.orderNo))
+  logistics.value = await getLogistics(String(route.params.orderNo)).catch(() => null)
 }
 
 async function run(fn: () => Promise<OrderVO>, tip: string) {
@@ -99,6 +145,7 @@ async function run(fn: () => Promise<OrderVO>, tip: string) {
   try {
     order.value = await fn()
     showToast(tip)
+    await load()
   } catch {
     // 请求层已提示
   } finally {
@@ -107,9 +154,13 @@ async function run(fn: () => Promise<OrderVO>, tip: string) {
 }
 
 const onPay = () => run(() => payOrder(order.value!.orderNo), '支付成功')
-const onShip = () => run(() => shipOrder(order.value!.orderNo), '已发货')
 const onConfirm = () => run(() => confirmOrder(order.value!.orderNo), '交易完成')
 const onCancel = () => run(() => cancelOrder(order.value!.orderNo), '订单已取消')
+
+function goLogistics(reschedule: boolean) {
+  const query = reschedule ? '?mode=reschedule' : ''
+  router.push(`/order/${order.value!.orderNo}/logistics${query}`)
+}
 
 onMounted(async () => {
   if (!store.user) {
@@ -136,7 +187,8 @@ onUnmounted(() => {
 }
 
 .hero.paid,
-.hero.shipped {
+.hero.scheduled,
+.hero.delivering {
   background: linear-gradient(135deg, #1989fa, #0570db);
 }
 
@@ -155,18 +207,27 @@ onUnmounted(() => {
   margin-top: 6px;
 }
 
+.thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  object-fit: cover;
+  margin-right: 10px;
+  background: #f2f3f5;
+}
+
 .total {
   font-weight: 600;
+}
+
+.minus {
+  color: #ee0a24;
 }
 
 .note {
   font-size: 12px;
   color: #969799;
   padding: 8px 16px;
-}
-
-:deep(.minus) {
-  color: #ee0a24;
 }
 
 .actions {

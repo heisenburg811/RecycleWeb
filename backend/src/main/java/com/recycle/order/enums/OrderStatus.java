@@ -4,19 +4,19 @@ package com.recycle.order.enums;
  * 订单状态机（PRD 7.5 的 MVP 子集）。
  *
  * <pre>
- * PENDING_PAYMENT ──支付──▶ PAID ──发货──▶ SHIPPED ──确认收货──▶ COMPLETED
- *        │
- *        ├──买家取消──▶ CANCELLED（释放商品）
- *        └──30 分钟超时─▶ CLOSED（释放商品）
+ * 配送单：PENDING_PAYMENT ─支付→ PAID ─预约时段→ SCHEDULED ─到点→ DELIVERING ─确认收货→ COMPLETED
+ * 自提单：PENDING_PAYMENT ─支付→ PAID ──────────买家确认收货──────────→ COMPLETED
+ *                   │
+ *                   ├─买家取消→ CANCELLED（释放商品）
+ *                   └─30 分钟超时→ CLOSED（释放商品）
  * </pre>
- *
- * <p>SHIPPED 目前由卖家手动推进；接入物流预约与运力回调后，改由运力签收驱动。
  */
 public enum OrderStatus {
 
     PENDING_PAYMENT("待支付"),
-    PAID("待发货"),
-    SHIPPED("配送中"),
+    PAID("待预约配送"),
+    SCHEDULED("已预约"),
+    DELIVERING("配送中"),
     COMPLETED("已完成"),
     CANCELLED("已取消"),
     CLOSED("已关闭");

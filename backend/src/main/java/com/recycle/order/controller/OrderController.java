@@ -53,14 +53,7 @@ public class OrderController {
         return R.ok(orderService.pay(orderNo, user.id(), req == null ? null : req.channel()));
     }
 
-    @Operation(summary = "发货（卖家）")
-    @PostMapping("/{orderNo}/ship")
-    public R<OrderVO> ship(@PathVariable String orderNo,
-                           @AuthenticationPrincipal LoginUser user) {
-        return R.ok(orderService.ship(orderNo, user.id()));
-    }
-
-    @Operation(summary = "确认收货（买家）", description = "订单完成，商品标记已售出")
+    @Operation(summary = "确认收货（买家）", description = "配送单需先到配送中；自提单付款后即可确认")
     @PostMapping("/{orderNo}/confirm")
     public R<OrderVO> confirm(@PathVariable String orderNo,
                               @AuthenticationPrincipal LoginUser user) {

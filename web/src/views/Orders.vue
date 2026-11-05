@@ -132,7 +132,8 @@ onMounted(() => load(true))
 }
 
 .status.paid,
-.status.shipped {
+.status.scheduled,
+.status.delivering {
   color: #1989fa;
 }
 
