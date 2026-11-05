@@ -33,12 +33,16 @@
       <p class="desc">{{ item.description || '卖家未填写描述' }}</p>
     </div>
 
+    <div v-if="!isOnSale" class="notice">{{ noticeText }}</div>
+
     <div class="bar">
       <div class="bar-price">
         <span class="price">{{ item.price }}</span>
         <span class="tiny">不含运费</span>
       </div>
-      <van-button type="danger" round @click="goOrder">立即购买</van-button>
+      <van-button v-if="isOwner" type="primary" round @click="goManage">管理商品</van-button>
+      <van-button v-else-if="isOnSale" type="danger" round @click="goOrder">立即购买</van-button>
+      <van-button v-else round disabled>{{ noticeText }}</van-button>
     </div>
   </div>
 </template>
@@ -48,9 +52,11 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getItem } from '@/api/item'
 import type { ItemDetail } from '@/api/types'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const store = useUserStore()
 const item = ref<ItemDetail | null>(null)
 
 const tradeText = computed(() => {
@@ -58,12 +64,37 @@ const tradeText = computed(() => {
   return item.value.tradeType === 1 ? '仅自提' : item.value.tradeType === 2 ? '仅配送' : '自提/配送均可'
 })
 
+const isOwner = computed(() => Boolean(store.user && item.value && store.user.id === item.value.sellerId))
+const isOnSale = computed(() => item.value?.status === 'ON_SALE')
+
+const noticeText = computed(() => {
+  switch (item.value?.status) {
+    case 'RESERVED':
+      return '已被预订'
+    case 'SOLD':
+      return '已售出'
+    case 'OFF_SHELF':
+      return '已下架'
+    case 'PENDING':
+      return '审核中'
+    default:
+      return '当前不可购买'
+  }
+})
+
 onMounted(async () => {
+  if (!store.user && store.isLogin) {
+    await store.loadMe().catch(() => undefined)
+  }
   item.value = await getItem(String(route.params.id))
 })
 
 function goOrder() {
   router.push(`/order/confirm/${route.params.id}`)
+}
+
+function goManage() {
+  router.push({ path: '/publish', query: { id: String(route.params.id) } })
 }
 </script>
 
@@ -122,6 +153,15 @@ function goOrder() {
 .bar-price {
   display: flex;
   flex-direction: column;
+}
+
+.notice {
+  margin: 12px;
+  padding: 10px 12px;
+  background: #fff7e6;
+  color: #d46b08;
+  border-radius: 6px;
+  font-size: 13px;
 }
 
 .tiny {

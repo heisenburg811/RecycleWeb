@@ -174,7 +174,137 @@ public class ItemService {
     }
 
     /**
-     * 按 ID 取商品实体，供其它模块使用（无副作用；detail() 会累加浏览量）。
+     * 我发布的商品（全部状态，倒序）。
+     */
+    public PageResult<ItemCardVO> myItems(Long sellerId, String status, int page, int size) {
+        LambdaQueryWrapper<Item> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Item::getSellerId, sellerId);
+        if (StringUtils.hasText(status)) {
+            wrapper.eq(Item::getStatus, status);
+        }
+        wrapper.orderByDesc(Item::getCreatedAt);
+
+        Page<Item> result = itemMapper.selectPage(new Page<>(page, Math.min(size, 50)), wrapper);
+        return PageResult.of(result.getRecords().stream().map(this::toCard).toList(),
+                result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    /**
+     * 编辑商品。
+     *
+     * <p>已预订 / 已售出的商品（PRD 5.4 R6）只允许降价，其余字段冻结——
+     * 否则买家看到的商品和下单时的不一致。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void update(Long id, ItemPublishReq req, Long sellerId) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) {
+            throw new BizException("商品不存在");
+        }
+        if (!item.getSellerId().equals(sellerId)) {
+            throw new BizException("无权操作该商品");
+        }
+
+        boolean locked = ItemStatus.RESERVED.name().equals(item.getStatus())
+                || ItemStatus.SOLD.name().equals(item.getStatus());
+        if (locked) {
+            if (req.getPrice() == null || req.getPrice().compareTo(item.getPrice()) > 0) {
+                throw new BizException("商品已被下单，只能降低价格");
+            }
+            if (contentChanged(item, req)) {
+                throw new BizException("商品已被下单，只能修改价格");
+            }
+            Item priceOnly = new Item();
+            priceOnly.setId(id);
+            priceOnly.setPrice(req.getPrice());
+            itemMapper.updateById(priceOnly);
+            return;
+        }
+
+        Item update = new Item();
+        update.setId(id);
+        update.setTitle(req.getTitle());
+        update.setDescription(req.getDescription());
+        update.setCategoryId(req.getCategoryId());
+        update.setItemCondition(req.getItemCondition());
+        update.setPrice(req.getPrice());
+        update.setLengthCm(req.getLengthCm());
+        update.setWidthCm(req.getWidthCm());
+        update.setHeightCm(req.getHeightCm());
+        update.setMaterial(req.getMaterial());
+        update.setStyle(req.getStyle());
+        update.setBrand(req.getBrand());
+        update.setTradeType(req.getTradeType());
+        update.setDistrictCode(req.getDistrictCode());
+        update.setAddress(req.getAddress());
+        update.setCoverUrl(req.getImages().get(0));
+        itemMapper.updateById(update);
+
+        itemImageMapper.delete(new LambdaQueryWrapper<ItemImage>().eq(ItemImage::getItemId, id));
+        for (int i = 0; i < req.getImages().size(); i++) {
+            itemImageMapper.insert(new ItemImage(id, req.getImages().get(i), i));
+        }
+    }
+
+    /**
+     * 下架 / 重新上架。只允许在售与已下架之间切换。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void changeStatus(Long id, String target, Long sellerId) {
+        if (!ItemStatus.ON_SALE.name().equals(target) && !ItemStatus.OFF_SHELF.name().equals(target)) {
+            throw new BizException("只支持上架或下架操作");
+        }
+        Item item = itemMapper.selectById(id);
+        if (item == null) {
+            throw new BizException("商品不存在");
+        }
+        if (!item.getSellerId().equals(sellerId)) {
+            throw new BizException("无权操作该商品");
+        }
+        Item update = new Item();
+        update.setStatus(target);
+        int rows = itemMapper.update(update, new LambdaQueryWrapper<Item>()
+                .eq(Item::getId, id)
+                .in(Item::getStatus, ItemStatus.ON_SALE.name(), ItemStatus.OFF_SHELF.name()));
+        if (rows == 0) {
+            throw new BizException("当前状态不可变更，请刷新后重试");
+        }
+    }
+
+    /**
+     * 删除商品。已预订 / 已售出的不能删，避免订单指向空数据。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id, Long sellerId) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) {
+            throw new BizException("商品不存在");
+        }
+        if (!item.getSellerId().equals(sellerId)) {
+            throw new BizException("无权操作该商品");
+        }
+        if (ItemStatus.RESERVED.name().equals(item.getStatus())
+                || ItemStatus.SOLD.name().equals(item.getStatus())) {
+            throw new BizException("商品已被下单，不能删除");
+        }
+        itemImageMapper.delete(new LambdaQueryWrapper<ItemImage>().eq(ItemImage::getItemId, id));
+        itemMapper.deleteById(id);
+    }
+
+    /**
+     * 判断除价格外的内容是否变化（锁定期用）。
+     */
+    private boolean contentChanged(Item item, ItemPublishReq req) {
+        return !java.util.Objects.equals(item.getTitle(), req.getTitle())
+                || !java.util.Objects.equals(item.getDescription(), req.getDescription())
+                || !java.util.Objects.equals(item.getCategoryId(), req.getCategoryId())
+                || !java.util.Objects.equals(item.getItemCondition(), req.getItemCondition())
+                || !java.util.Objects.equals(item.getTradeType(), req.getTradeType())
+                || !java.util.Objects.equals(item.getCoverUrl(), req.getImages().get(0));
+    }
+
+    /**
+     * 供其它模块按 ID 取商品实体（不产生副作用，detail 会累加浏览量）。
      */
     public Item getById(Long id) {
         return itemMapper.selectById(id);
@@ -197,7 +327,8 @@ public class ItemService {
     private ItemCardVO toCard(Item item) {
         return new ItemCardVO(item.getId(), item.getTitle(), item.getPrice(), item.getCoverUrl(),
                 item.getItemCondition(), ItemCondition.labelOf(item.getItemCondition()),
-                item.getDistrictCode(), item.getTradeType(), item.getViewCount(), item.getCreatedAt());
+                item.getDistrictCode(), item.getTradeType(), item.getViewCount(), item.getCreatedAt(),
+                item.getStatus());
     }
 
     /**

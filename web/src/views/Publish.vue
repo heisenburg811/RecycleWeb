@@ -1,17 +1,18 @@
 <template>
   <div class="page">
-    <van-nav-bar title="发布闲置家具" />
+    <van-nav-bar :title="editId ? '编辑商品' : '发布闲置家具'" left-arrow @click-left="router.back()" />
 
     <van-cell-group inset title="照片">
-      <van-field
-        v-model="form.imagesText"
-        type="textarea"
-        rows="2"
-        autosize
-        label="图片链接"
-        placeholder="每行一个图片地址，第一张为主图"
-      />
-      <div class="hint">接入对象存储后改为上传组件（PRD 5.3 字段 1）</div>
+      <div class="uploader">
+        <van-uploader
+          v-model="fileList"
+          :max-count="9"
+          :after-read="afterRead"
+          accept="image/*"
+          multiple
+        />
+      </div>
+      <div class="hint">第一张为主图，最多 9 张；单张不超过 5MB</div>
     </van-cell-group>
 
     <van-cell-group inset title="基本信息">
@@ -59,7 +60,9 @@
     </van-cell-group>
 
     <div class="submit">
-      <van-button type="primary" block round :loading="submitting" @click="submit">提交审核</van-button>
+      <van-button type="primary" block round :loading="submitting" @click="submit">
+        {{ editId ? '保存修改' : '提交审核' }}
+      </van-button>
     </div>
 
     <van-popup v-model:show="showPicker" position="bottom">
@@ -73,16 +76,21 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { getCategories, publishItem } from '@/api/item'
+import type { UploaderFileListItem } from 'vant'
+import { getCategories, getItem, publishItem, updateItem, uploadImage } from '@/api/item'
 import type { CategoryNode } from '@/api/types'
 
 const router = useRouter()
+const route = useRoute()
+
+const editId = computed(() => (route.query.id ? Number(route.query.id) : null))
 const showPicker = ref(false)
 const submitting = ref(false)
 const categoryName = ref('沙发座椅 / 三人沙发')
+const fileList = ref<UploaderFileListItem[]>([])
 
 const conditions = [
   { text: '全新', value: 5 },
@@ -93,7 +101,6 @@ const conditions = [
 ]
 
 const form = reactive({
-  imagesText: 'https://picsum.photos/seed/mine1/600/600',
   categoryId: 11,
   title: '',
   itemCondition: 3,
@@ -117,7 +124,46 @@ onMounted(async () => {
   categoryColumns.value = tree.flatMap((top: CategoryNode) =>
     top.children.map((sub) => ({ text: `${top.name} / ${sub.name}`, value: sub.id }))
   )
+
+  if (editId.value) {
+    const item = await getItem(editId.value)
+    form.categoryId = item.categoryId
+    form.title = item.title
+    form.itemCondition = item.itemCondition
+    form.price = String(item.price)
+    form.lengthCm = item.lengthCm ? String(item.lengthCm) : ''
+    form.widthCm = item.widthCm ? String(item.widthCm) : ''
+    form.heightCm = item.heightCm ? String(item.heightCm) : ''
+    form.material = item.material ?? ''
+    form.style = item.style ?? ''
+    form.brand = item.brand ?? ''
+    form.description = item.description ?? ''
+    form.tradeType = item.tradeType
+    form.districtCode = item.districtCode
+    fileList.value = item.images.map((url) => ({ url }))
+    const matched = categoryColumns.value.find((c) => c.value === item.categoryId)
+    if (matched) categoryName.value = matched.text
+  }
 })
+
+/** 选完图立刻上传，成功就把本地预览换成服务器地址 */
+async function afterRead(items: UploaderFileListItem | UploaderFileListItem[]) {
+  const list = Array.isArray(items) ? items : [items]
+  for (const item of list) {
+    if (!item.file) continue
+    item.status = 'uploading'
+    item.message = '上传中'
+    try {
+      const url = await uploadImage(item.file)
+      item.url = url
+      item.status = 'done'
+      item.message = ''
+    } catch {
+      item.status = 'failed'
+      item.message = '上传失败'
+    }
+  }
+}
 
 function onCategoryConfirm({ selectedOptions }: { selectedOptions: { text: string; value: number }[] }) {
   const picked = selectedOptions[0]
@@ -127,13 +173,12 @@ function onCategoryConfirm({ selectedOptions }: { selectedOptions: { text: strin
 }
 
 async function submit() {
-  const images = form.imagesText
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean)
+  const images = fileList.value
+    .filter((f) => f.status === 'done' && f.url && f.url.startsWith('/uploads'))
+    .map((f) => f.url as string)
 
   if (images.length === 0) {
-    showToast('至少上传一张图片')
+    showToast('请至少上传一张图片')
     return
   }
   if (form.title.length < 5) {
@@ -165,9 +210,15 @@ async function submit() {
       if (form[key]) payload[key] = form[key]
     }
 
-    const id = await publishItem(payload)
-    showToast('发布成功')
-    router.replace(`/item/${id}`)
+    if (editId.value) {
+      await updateItem(editId.value, payload)
+      showToast('已保存')
+      router.replace(`/item/${editId.value}`)
+    } else {
+      const id = await publishItem(payload)
+      showToast('发布成功')
+      router.replace(`/item/${id}`)
+    }
   } finally {
     submitting.value = false
   }
@@ -175,10 +226,14 @@ async function submit() {
 </script>
 
 <style scoped>
+.uploader {
+  padding: 12px 16px;
+}
+
 .hint {
   font-size: 12px;
   color: #969799;
-  padding: 8px 16px;
+  padding: 0 16px 12px;
 }
 
 .submit {

@@ -77,10 +77,14 @@ public class SecurityConfig {
                         // 认证接口（refresh 与 logout 必须匿名可达：access token 过期后也要能换/退）
                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
                                 "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                        // 「我的发布」必须登录，要排在下面的 GET 放行规则之前
+                        .requestMatchers(HttpMethod.GET, "/api/v1/items/mine").authenticated()
                         // 浏览类接口匿名开放
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/items", "/api/v1/items/**",
                                 "/api/v1/categories", "/api/v1/search/**").permitAll()
+                        // 上传的图片
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         // 文档与运维
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
                                 "/h2-console/**", "/actuator/health").permitAll()

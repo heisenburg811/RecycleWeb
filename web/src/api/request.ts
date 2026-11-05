@@ -101,3 +101,18 @@ export async function post<T>(url: string, body?: unknown): Promise<T> {
   const { data } = await http.post<ApiResponse<T>>(url, body)
   return unwrap(data)
 }
+
+export async function put<T>(url: string, body?: unknown): Promise<T> {
+  const { data } = await http.put<ApiResponse<T>>(url, body)
+  return unwrap(data)
+}
+
+export async function patch<T>(url: string, body?: unknown): Promise<T> {
+  const { data } = await http.patch<ApiResponse<T>>(url, body)
+  return unwrap(data)
+}
+
+export async function del<T>(url: string): Promise<T> {
+  const { data } = await http.delete<ApiResponse<T>>(url)
+  return unwrap(data)
+}

@@ -9,6 +9,7 @@ export interface ItemCard {
   tradeType: number
   viewCount: number
   createdAt: string
+  status: string
 }
 
 export interface ItemDetail {
