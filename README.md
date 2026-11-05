@@ -107,11 +107,23 @@ cd backend
 
 ## 鉴权约定
 
+**双令牌：短 access + 长 refresh**
+
+| 令牌 | 有效期 | 存放 | 用途 |
+| --- | --- | --- | --- |
+| accessToken | 30 分钟 | JWT，无状态，**不查库** | 每个请求放 `Authorization: Bearer` |
+| refreshToken | 7 天 | 数据库 `refresh_token` 表（只存 SHA-256 摘要） | 只用于换新令牌，一次性 |
+
 - 接口分两类：**浏览开放**（GET 商品/类目/搜索，匿名可看）、**写入需登录**（POST/PUT/DELETE、`/orders/**`）。
 - 新增接口若未显式加放行规则，默认**需要登录**（fail-safe，不会误开放）。
-- 请求头：`Authorization: Bearer <token>`；token 由 `/api/v1/auth/login` 返回。
-- 未登录 / token 失效 → HTTP 401 + `{"code":40100,"message":"请先登录"}`，前端拦截器自动跳登录页并带回跳地址。
+- 未登录 / access 过期 → HTTP 401 + `{"code":40100,"message":"请先登录"}`；前端拦截器自动用 refresh 换一次新令牌并重放原请求，换不到才跳登录页。
+- **刷新即轮换**：旧 refresh 用过立即作废，发新的。已作废的令牌再次出现 → 判定为疑似盗用，**撤销该用户全部刷新令牌**，所有设备强制重新登录。
+- **登出**：`POST /api/v1/auth/logout` 撤销 refresh token；access token 无状态，到期自然失效。
 - 密钥通过 `JWT_SECRET` 环境变量注入，默认值仅供本地开发，**上线必须替换**。
+
+> 为什么不用 Redis 存 token：当前没有「秒级踢人」需求，access token 无状态最省一次 IO；
+> 需要撤销时用数据库表即可，不引入新中间件。将来量级上来，把 `RefreshTokenService`
+> 换成 Redis 实现即可，调用方不用改。
 
 ## 约定
 

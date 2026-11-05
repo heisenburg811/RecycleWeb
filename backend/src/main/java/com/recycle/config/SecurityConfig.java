@@ -74,8 +74,9 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // 认证接口
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        // 认证接口（refresh 与 logout 必须匿名可达：access token 过期后也要能换/退）
+                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
+                                "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         // 浏览类接口匿名开放
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/items", "/api/v1/items/**",

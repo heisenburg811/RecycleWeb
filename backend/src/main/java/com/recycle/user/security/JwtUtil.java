@@ -26,7 +26,7 @@ public class JwtUtil {
     private final long expireMillis;
 
     public JwtUtil(@Value("${app.jwt.secret}") String secret,
-                   @Value("${app.jwt.expire-seconds:604800}") long expireSeconds) {
+                   @Value("${app.jwt.access-expire-seconds:1800}") long expireSeconds) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expireMillis = expireSeconds * 1000L;
     }

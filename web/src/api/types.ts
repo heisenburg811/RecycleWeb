@@ -80,7 +80,9 @@ export interface UserVO {
 }
 
 export interface LoginVO {
-  token: string
-  expiresIn: number
+  accessToken: string
+  refreshToken: string
+  accessExpiresIn: number
+  refreshExpiresIn: number
   user: UserVO
 }

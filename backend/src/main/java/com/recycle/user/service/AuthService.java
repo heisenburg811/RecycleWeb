@@ -20,11 +20,16 @@ public class AuthService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final RefreshTokenService refreshTokenService;
 
-    public AuthService(UserMapper userMapper, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+    public AuthService(UserMapper userMapper,
+                       PasswordEncoder passwordEncoder,
+                       JwtUtil jwtUtil,
+                       RefreshTokenService refreshTokenService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -62,6 +67,29 @@ public class AuthService {
         return issue(user);
     }
 
+    /**
+     * 用 refresh token 换一对新令牌（轮换：旧的随即作废）。
+     *
+     * <p>不加事务：重放检测要「先撤销再抛异常」，被事务包住会把撤销回滚掉。
+     */
+    public LoginVO refresh(String rawRefreshToken) {
+        Long userId = refreshTokenService.rotate(rawRefreshToken);
+        User user = userMapper.selectById(userId);
+        if (user == null || (user.getStatus() != null && user.getStatus() == 0)) {
+            throw new BizException("账号不可用，请重新登录");
+        }
+        return issue(user);
+    }
+
+    /**
+     * 登出：撤销 refresh token，幂等。access token 无状态，到期自然失效。
+     */
+    public void logout(String rawRefreshToken) {
+        if (StringUtils.hasText(rawRefreshToken)) {
+            refreshTokenService.revoke(rawRefreshToken);
+        }
+    }
+
     public UserVO me(Long userId) {
         User user = userMapper.selectById(userId);
         if (user == null) {
@@ -71,7 +99,11 @@ public class AuthService {
     }
 
     private LoginVO issue(User user) {
-        String token = jwtUtil.generate(user.getId(), user.getPhone(), user.getNickname());
-        return new LoginVO(token, jwtUtil.getExpireSeconds(), UserVO.of(user));
+        String accessToken = jwtUtil.generate(user.getId(), user.getPhone(), user.getNickname());
+        String refreshToken = refreshTokenService.issue(user.getId());
+        return new LoginVO(accessToken, refreshToken,
+                jwtUtil.getExpireSeconds(),
+                refreshTokenService.getRefreshExpireSeconds(),
+                UserVO.of(user));
     }
 }

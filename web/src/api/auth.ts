@@ -9,6 +9,10 @@ export function apiRegister(phone: string, password: string, nickname?: string):
   return post<LoginVO>('/auth/register', { phone, password, nickname })
 }
 
+export function apiLogout(refreshToken: string): Promise<void> {
+  return post<void>('/auth/logout', { refreshToken })
+}
+
 export function fetchMe(): Promise<UserVO> {
   return get<UserVO>('/auth/me')
 }

@@ -51,8 +51,7 @@ onMounted(() => {
 })
 
 function logout() {
-  store.logout()
-  router.replace('/')
+  store.logout().finally(() => router.replace('/'))
 }
 </script>
 

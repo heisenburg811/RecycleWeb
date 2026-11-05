@@ -132,3 +132,18 @@ CREATE TABLE payments (
     created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_pay_order ON payments (order_no);
+
+-- ------------------------------------------------------------
+-- 刷新令牌（替代 Redis 存 token：能撤销、可持久化、无需新增中间件）
+-- 只存 SHA-256 摘要，库被拖走也拿不到可用 token
+-- ------------------------------------------------------------
+CREATE TABLE refresh_token (
+    id         BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id    BIGINT      NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMP   NOT NULL,
+    revoked    TINYINT     NOT NULL DEFAULT 0,
+    created_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX uk_refresh_hash ON refresh_token (token_hash);
+CREATE INDEX idx_refresh_user ON refresh_token (user_id);
