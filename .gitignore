@@ -1,0 +1,31 @@
+# ---- Java / Maven ----
+backend/target/
+*.class
+*.jar
+!backend/.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# ---- Node / Vite ----
+web/node_modules/
+web/dist/
+web/.vite/
+npm-debug.log*
+pnpm-debug.log*
+
+# ---- IDE ----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 本地配置 ----
+.env
+.env.local
+backend/src/main/resources/application-local.yml

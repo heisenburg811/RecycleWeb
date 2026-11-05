@@ -1,0 +1,105 @@
+# 旧物新生 · 二手家具交易平台
+
+同城二手家具交易与回收平台。产品需求见 [`docs/PRD-MVP-v1.0.md`](docs/PRD-MVP-v1.0.md)。
+
+## 技术栈
+
+| 端 | 技术 |
+| --- | --- |
+| 后端 | Java 21 · Spring Boot 3.5 · MyBatis-Plus 3.5 · H2（开发）/ MySQL 8（生产） |
+| 前端 | Vite 6 · Vue 3.5 · TypeScript · Vant 4 · Pinia · Vue Router |
+| 文档 | springdoc-openapi（Swagger UI） |
+
+**架构决策**：单体应用，按业务域分包，不引入 Spring Cloud（理由见 PRD 与团队讨论记录）。模块间只通过 Service 接口或领域事件交互，禁止跨包直接访问 Mapper——这样将来要拆服务时，包即服务。
+
+## 目录结构
+
+```
+Recycle/
+├── docs/
+│   └── PRD-MVP-v1.0.md          # 产品需求文档
+├── backend/                      # Spring Boot 单体
+│   ├── pom.xml
+│   ├── mvnw / mvnw.cmd           # Maven 包装器，无需预装 Maven
+│   └── src/main/
+│       ├── java/com/recycle/
+│       │   ├── common/           # 统一返回 R、分页、异常处理
+│       │   ├── config/           # CORS、MyBatis-Plus、OpenAPI
+│       │   ├── item/             # 商品发布 / 状态机 / 图片
+│       │   ├── search/           # 类目树 / 搜索
+│       │   ├── order/            # 订单（当前：费用试算）
+│       │   ├── payment/          # 待建
+│       │   └── logistics/        # 待建
+│       └── resources/
+│           ├── application.yml    # dev：H2 内存库，自动建表灌数据
+│           ├── application-prod.yml
+│           └── db/schema.sql      # 建表脚本（唯一事实来源）
+└── web/                          # Vite + Vue3 H5
+    └── src/
+        ├── api/                  # axios 封装 + 类型定义
+        ├── views/                # 首页 / 搜索 / 详情 / 发布 / 确认订单
+        └── router/
+```
+
+## 快速开始
+
+### 1. 后端
+
+```bash
+cd backend
+./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
+```
+
+- 服务地址：http://localhost:8080
+- 接口文档：http://localhost:8080/swagger-ui.html
+- H2 控制台：http://localhost:8080/h2-console
+  - JDBC URL：`jdbc:h2:mem:recycle`，用户名 `sa`，密码留空
+
+默认 `dev` profile 使用 **H2 内存库**，启动时自动执行 `db/schema.sql` + `db/data.sql`，自带 8 件演示商品，改代码重启即重建，不依赖本地装 MySQL/Redis。
+
+### 2. 前端
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+访问 http://localhost:5173 ，`/api` 已代理到 8080。
+
+### 3. 切到 MySQL
+
+```bash
+cd backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+先建库 `CREATE DATABASE recycle DEFAULT CHARSET utf8mb4;`，再手工执行 `src/main/resources/db/schema.sql`。连接信息改 `application-prod.yml`。
+
+## 已实现（本次脚手架）
+
+- [x] 统一响应体 `R<T>`、全局异常处理、参数校验
+- [x] 商品发布（字段校验、联系方式拦截、图片落库、自动上架）
+- [x] 商品列表 / 关键词搜索 / 多维筛选 / 排序 / 详情（浏览计数）
+- [x] 类目树（静态配置）
+- [x] 下单前费用试算：起步价 + 里程 + 体积档 + 楼层 + 拆装 + 5% 服务费（PRD 7.1 全部规则）
+- [x] 前端 H5 五个页面跑通「浏览 → 搜索 → 详情 → 发布 → 确认订单」
+
+## 待开发（按 PRD 优先级）
+
+| 优先级 | 事项 | 位置 |
+| --- | --- | --- |
+| P0 | 登录鉴权（目前用 `X-User-Id` 头模拟，固定为 1） | `common` + 新增 `user` 模块 |
+| P0 | 完整下单：锁库存 → 建单 → 状态机 | `order`（`ItemService.reserve()` 已就绪） |
+| P0 | 支付对接（微信 / 支付宝）+ 回调 + 担保交易 | `payment` |
+| P0 | 物流预约：时段容量、运力派单、改约 | `logistics` |
+| P1 | 商品审核后台（目前发布即上架） | `item` + 管理端 |
+| P1 | 图片上传（目前前端填 URL） | 接入 OSS |
+| P2 | 类目落表、碳减排字段计算、回收表单 | `search` / `item` |
+
+## 约定
+
+- **跨模块调用走 Service**：如 `OrderService` 调 `ItemService.getById()`，不直接注入对方 Mapper。
+- **状态用枚举名落库**：如 `item.status = 'ON_SALE'`，排查 SQL 时可读。
+- **费用规则集中在 `FeeCalculator`**，改费率只动一个类。
+- 数据库字段：`item.weight_kg` / `carbon_saved_kg` / `recycle_flag` 为二期碳核算预留，先落库不计算。
