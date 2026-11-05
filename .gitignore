@@ -19,6 +19,7 @@ pnpm-debug.log*
 *.iws
 .vscode/
 *.swp
+out/
 
 # ---- OS ----
 .DS_Store

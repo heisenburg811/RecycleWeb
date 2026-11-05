@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.recycle</groupId>
+    <artifactId>recycle-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Recycle</name>
+    <description>
+        聚合工程：只用于让 IDE 打开仓库根目录时能一次性识别并导入 Maven 模块。
+        不参与继承——backend/pom.xml 的 parent 仍是 spring-boot-starter-parent。
+        构建入口依旧是 backend/mvnw，不要用本文件直接跑构建。
+    </description>
+
+    <modules>
+        <module>backend</module>
+    </modules>
+</project>
