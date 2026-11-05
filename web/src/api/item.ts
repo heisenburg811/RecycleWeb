@@ -1,5 +1,5 @@
 import { get, post } from './request'
-import type { CategoryNode, FeeDetail, ItemCard, ItemDetail, PageQuery, PageResult } from './types'
+import type { CategoryNode, ItemCard, ItemDetail, PageQuery, PageResult } from './types'
 
 export function pageItems(query: PageQuery): Promise<PageResult<ItemCard>> {
   return get<PageResult<ItemCard>>('/items', query as Record<string, unknown>)
@@ -19,8 +19,4 @@ export function getCategories(): Promise<CategoryNode[]> {
 
 export function getHotWords(): Promise<string[]> {
   return get<string[]>('/search/hot')
-}
-
-export function quoteOrder(payload: Record<string, unknown>): Promise<FeeDetail> {
-  return post<FeeDetail>('/orders/quote', payload)
 }

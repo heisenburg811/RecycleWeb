@@ -59,6 +59,32 @@ export interface FeeDetail {
   note: string
 }
 
+export interface OrderVO {
+  id: number
+  orderNo: string
+  itemId: number
+  itemTitle: string
+  itemCover: string | null
+  buyerId: number
+  sellerId: number
+  itemPrice: number
+  deliveryFee: number
+  floorFee: number
+  assemblyFee: number
+  serviceFee: number
+  totalAmount: number
+  deliveryType: number
+  addressSnapshot: string | null
+  status: string
+  statusLabel: string
+  payExpireAt: string | null
+  paidAt: string | null
+  shippedAt: string | null
+  completedAt: string | null
+  remark: string | null
+  createdAt: string
+}
+
 export interface PageQuery {
   keyword?: string
   categoryId?: number

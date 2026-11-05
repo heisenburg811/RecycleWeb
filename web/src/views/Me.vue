@@ -12,8 +12,8 @@
       </div>
 
       <van-cell-group inset>
-        <van-cell title="我发布的" is-link to="/orders" />
-        <van-cell title="我的订单" is-link to="/orders" />
+        <van-cell title="我买到的" is-link to="/orders" />
+        <van-cell title="我卖出的" is-link to="/orders?role=seller" />
       </van-cell-group>
 
       <div class="submit">

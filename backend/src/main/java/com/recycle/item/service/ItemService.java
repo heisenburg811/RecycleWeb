@@ -147,6 +147,33 @@ public class ItemService {
     }
 
     /**
+     * 释放商品：订单取消或超时关单时调用，把已预订改回在售。
+     * 带状态条件，避免把已售出的商品错误地放回货架。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean release(Long itemId) {
+        Item update = new Item();
+        update.setStatus(ItemStatus.ON_SALE.name());
+        int rows = itemMapper.update(update, new LambdaQueryWrapper<Item>()
+                .eq(Item::getId, itemId)
+                .eq(Item::getStatus, ItemStatus.RESERVED.name()));
+        return rows > 0;
+    }
+
+    /**
+     * 标记售出：订单完成后调用。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean markSold(Long itemId) {
+        Item update = new Item();
+        update.setStatus(ItemStatus.SOLD.name());
+        int rows = itemMapper.update(update, new LambdaQueryWrapper<Item>()
+                .eq(Item::getId, itemId)
+                .eq(Item::getStatus, ItemStatus.RESERVED.name()));
+        return rows > 0;
+    }
+
+    /**
      * 按 ID 取商品实体，供其它模块使用（无副作用；detail() 会累加浏览量）。
      */
     public Item getById(Long id) {

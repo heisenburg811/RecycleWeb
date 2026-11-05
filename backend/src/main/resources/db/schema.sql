@@ -81,6 +81,8 @@ CREATE TABLE orders (
     item_id          BIGINT        NOT NULL,
     buyer_id         BIGINT        NOT NULL,
     seller_id        BIGINT        NOT NULL,
+    item_title       VARCHAR(60),
+    item_cover       VARCHAR(255),
     item_price       DECIMAL(10,2) NOT NULL,
     delivery_fee     DECIMAL(10,2) NOT NULL DEFAULT 0,
     floor_fee        DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -91,11 +93,15 @@ CREATE TABLE orders (
     address_snapshot VARCHAR(500),
     status           VARCHAR(20)   NOT NULL,
     pay_expire_at    TIMESTAMP,
+    paid_at          TIMESTAMP,
+    shipped_at       TIMESTAMP,
+    completed_at     TIMESTAMP,
     remark           VARCHAR(200),
     created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX uk_order_no ON orders (order_no);
 CREATE INDEX idx_order_buyer  ON orders (buyer_id, created_at);
+CREATE INDEX idx_order_seller ON orders (seller_id, created_at);
 CREATE INDEX idx_order_status ON orders (status);
 
 -- ------------------------------------------------------------

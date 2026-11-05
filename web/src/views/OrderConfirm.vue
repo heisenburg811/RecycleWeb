@@ -7,7 +7,7 @@
     </van-cell-group>
 
     <van-cell-group inset title="配送方式">
-      <van-radio-group v-model="form.deliveryType" class="delivery">
+      <van-radio-group v-model="form.deliveryType">
         <van-cell title="平台配送" label="可预约时段，按体积与楼层计价" clickable @click="form.deliveryType = 2">
           <template #right-icon><van-radio :name="2" /></template>
         </van-cell>
@@ -18,6 +18,7 @@
     </van-cell-group>
 
     <van-cell-group v-if="form.deliveryType === 2" inset title="配送信息">
+      <van-field v-model="form.address" label="收货地址" placeholder="小区 + 楼栋 + 门牌" maxlength="200" />
       <van-field v-model="form.distanceKm" type="number" label="距离(km)" placeholder="如 5.2" />
       <van-field v-model="form.floor" type="number" label="楼层" placeholder="1 表示一楼" />
       <van-field label="有电梯">
@@ -47,7 +48,7 @@
 
     <div class="bar">
       <div class="total-text">合计 <span class="price">{{ fee?.totalAmount ?? '-' }}</span></div>
-      <van-button type="danger" round @click="submit">提交订单</van-button>
+      <van-button type="danger" round :loading="submitting" @click="submit">提交订单</van-button>
     </div>
   </div>
 </template>
@@ -56,53 +57,80 @@
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { getItem, quoteOrder } from '@/api/item'
+import { getItem } from '@/api/item'
+import { createOrder, quoteOrder } from '@/api/order'
 import type { FeeDetail, ItemDetail } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
 const item = ref<ItemDetail | null>(null)
 const fee = ref<FeeDetail | null>(null)
+const submitting = ref(false)
 
 const form = reactive({
   deliveryType: 2,
   distanceKm: '5',
   floor: '2',
   hasElevator: false,
-  assemblyType: 'none'
+  assemblyType: 'none',
+  address: ''
 })
 
 async function refreshQuote() {
-  fee.value = await quoteOrder({
-    itemId: Number(route.params.id),
-    deliveryType: form.deliveryType,
-    distanceKm: form.deliveryType === 2 ? Number(form.distanceKm) : null,
-    floor: form.deliveryType === 2 ? Number(form.floor) : null,
-    hasElevator: form.hasElevator,
-    assemblyType: form.assemblyType
-  })
+  try {
+    fee.value = await quoteOrder({
+      itemId: Number(route.params.id),
+      deliveryType: form.deliveryType,
+      distanceKm: form.deliveryType === 2 ? Number(form.distanceKm) : null,
+      floor: form.deliveryType === 2 ? Number(form.floor) : null,
+      hasElevator: form.hasElevator,
+      assemblyType: form.assemblyType
+    })
+  } catch {
+    // 请求层已提示
+  }
 }
 
 onMounted(async () => {
   item.value = await getItem(String(route.params.id))
+  // 商品只支持自提时，默认切过去
+  if (item.value?.tradeType === 1) form.deliveryType = 1
   await refreshQuote()
 })
 
-watch(() => [form.deliveryType, form.distanceKm, form.floor, form.hasElevator, form.assemblyType], refreshQuote, {
-  deep: true
-})
+watch(
+  () => [form.deliveryType, form.distanceKm, form.floor, form.hasElevator, form.assemblyType],
+  refreshQuote,
+  { deep: true }
+)
 
-function submit() {
-  // TODO 对接 POST /orders：锁库存 → 建单 → 拉起支付
-  showToast('下单接口待接入，当前仅演示费用试算')
+async function submit() {
+  if (form.deliveryType === 2 && !form.address.trim()) {
+    showToast('请填写收货地址')
+    return
+  }
+  submitting.value = true
+  try {
+    const order = await createOrder({
+      itemId: Number(route.params.id),
+      deliveryType: form.deliveryType,
+      distanceKm: form.deliveryType === 2 ? Number(form.distanceKm) : null,
+      floor: form.deliveryType === 2 ? Number(form.floor) : null,
+      hasElevator: form.hasElevator,
+      assemblyType: form.assemblyType,
+      address: form.deliveryType === 2 ? form.address : null
+    })
+    showToast('下单成功，请在 30 分钟内支付')
+    router.replace(`/order/${order.orderNo}`)
+  } catch {
+    // 请求层已提示
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 
 <style scoped>
-.delivery {
-  display: block;
-}
-
 .total {
   font-weight: 600;
 }
